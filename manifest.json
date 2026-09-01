@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "tarpediem.screenshot",
+  "name": "Screenshot",
+  "version": "1.0.0",
+  "author": "Olivier Magnier",
+  "license": "MIT",
+  "description": "Screenshot, screen recording, OCR and QR capture from the Omarchy bar.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Screenshot",
+    "description": "One-click screenshots (smart/region/window/fullscreen), screen recording with a live stop button, OCR, QR and color picker.",
+    "category": "Utilities",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "processing": "slurp"
+    },
+    "schema": [
+      {
+        "key": "processing",
+        "type": "enum",
+        "label": "After capture",
+        "options": ["slurp", "copy", "save"],
+        "defaultValue": "slurp",
+        "description": "slurp = save + clipboard + editor notification, copy = clipboard only, save = file only."
+      }
+    ]
+  }
+}
