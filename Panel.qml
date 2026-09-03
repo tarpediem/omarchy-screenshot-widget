@@ -22,6 +22,8 @@ Panel {
   property int cursor: -1
   property string pendingCommand: ""
 
+  readonly property string pluginPath: Quickshell.env("HOME") + "/.config/omarchy/plugins/tarpediem.screenshot"
+
   // What happens to a screenshot once captured — the second argument of
   // omarchy-capture-screenshot. Persisted in shell.json the way the clock
   // persists its format, so the choice survives a shell restart.
@@ -42,6 +44,7 @@ Panel {
       { type: "action", icon: "\uf125", label: "Region",       hint: "r", cmd: "omarchy-capture-screenshot region" + p },
       { type: "action", icon: "\uf2d0", label: "Window",       hint: "w", cmd: "omarchy-capture-screenshot windows" + p },
       { type: "action", icon: "\uf065", label: "Full screen",  hint: "f", cmd: "omarchy-capture-screenshot fullscreen" + p },
+      { type: "action", icon: "\u{F05A0}", label: "Webcam photo", hint: "b", cmd: "bash " + pluginPath + "/webcam-shot.sh" + p },
       { type: "header", label: "RECORDING" }
     ]
     if (recording) {

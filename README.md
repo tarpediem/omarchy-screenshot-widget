@@ -43,7 +43,7 @@ already uses for its own capture commands.
 | Section | Rows |
 |---|---|
 | After capture | **Edit** (save + clipboard + editor notification), **Copy** (clipboard only), **Save** (file only) — the second argument of `omarchy-capture-screenshot` |
-| Screenshot | Smart region, Region, Window, Full screen |
+| Screenshot | Smart region, Region, Window, Full screen, Webcam photo (live mpv viewfinder — `Space` shoots, `Q` cancels; honors the after-capture mode) |
 | Recording | Record region, Record full screen, Record with desktop + microphone audio — replaced by **Stop recording** while one runs |
 | Tools | Text (OCR), QR code, Color picker |
 
@@ -64,6 +64,7 @@ capture, so the popup never ends up in the screenshot.
 | `j` / `k`, arrows | move the cursor |
 | `Enter`, `Space` | run the highlighted row |
 | `s` `r` `w` `f` | smart / region / window / full-screen screenshot |
+| `b` | webcam photo (photobooth preview) |
 | `v` `V` `a` | record region / full screen / with audio |
 | `x` | stop recording |
 | `t` `q` `c` | OCR text / QR code / color picker |
