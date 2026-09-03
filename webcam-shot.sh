@@ -1,10 +1,17 @@
 #!/bin/bash
 # Webcam photo for the screenshot widget, photobooth style.
-# Usage: webcam-shot.sh [booth|slurp|copy|save] [--no-preview]
-#   booth (default): save the file AND put it on the clipboard, with a
-#   notification — what the widget's in-panel viewfinder uses.
-#   Standalone CLI use without --no-preview opens an mpv viewfinder instead;
-#   SPACE / ENTER / left click takes the photo, Q / ESC cancels.
+# Usage:
+#   webcam-shot.sh [booth|slurp|copy|save]                 mpv viewfinder, then capture
+#   webcam-shot.sh [mode] --no-preview                     capture straight away
+#   webcam-shot.sh [mode] --from-frame <file>              use an existing frame
+#
+# booth (default): save the file AND put it on the clipboard, with a
+# notification — what the widget uses.
+#
+# --from-frame is the widget's in-panel flow: the viewfinder already keeps
+# its latest full-resolution frame on tmpfs, and the photo is that exact
+# frame — the camera is never reopened (no LED blink, no delay).
+#
 # Device override: WEBCAM_DEVICE=/dev/videoN
 
 [[ -f ~/.config/user-dirs.dirs ]] && source ~/.config/user-dirs.dirs
@@ -16,36 +23,44 @@ DEVICE="${WEBCAM_DEVICE:-/dev/video0}"
 FILENAME="webcam-$(date +'%Y-%m-%d_%H-%M-%S').jpg"
 FILEPATH="$OUTPUT_DIR/$FILENAME"
 
-if [[ $2 != "--no-preview" ]]; then
-  # Live viewfinder. mpv exits 0 on the shoot keys (quit 0) and 4 on the
-  # cancel keys; anything but 0 aborts without touching the disk.
-  mpv --really-quiet --profile=low-latency --untimed \
-    --demuxer-lavf-o=video_size=1280x720 \
-    --title="Webcam — SPACE: photo, Q: cancel" \
-    --input-conf=<(printf '%s\n' "SPACE quit 0" "ENTER quit 0" "MBTN_LEFT quit 0" "q quit 4" "ESC quit 4") \
-    "av://v4l2:$DEVICE"
-  [[ $? -ne 0 ]] && exit 0
-fi
-
-# Read ~20 frames and keep only the last one (-update 1) so auto-exposure and
-# white balance have settled; a cold camera's first frame is dark garbage.
-# Retried briefly: right after the preview closes, mpv may not have released
-# the device yet. 1080p first, then the camera's default size as fallback.
-capture() {
-  ffmpeg -hide_banner -loglevel error -f v4l2 -framerate 30 "$@" \
-    -i "$DEVICE" -frames:v 20 -update 1 -y "$FILEPATH"
-}
-ok=""
-for _ in 1 2 3; do
-  if capture -video_size 1920x1080 2>/dev/null || capture; then
-    ok=1
-    break
+if [[ $2 == "--from-frame" ]]; then
+  if [[ ! -s $3 ]]; then
+    omarchy-notification-send "Webcam capture failed" "No viewfinder frame found" || true
+    exit 1
   fi
-  sleep 0.5
-done
-if [[ -z $ok ]]; then
-  omarchy-notification-send "Webcam capture failed" "No usable camera on $DEVICE" || true
-  exit 1
+  cp "$3" "$FILEPATH"
+else
+  if [[ $2 != "--no-preview" ]]; then
+    # Standalone CLI viewfinder. mpv exits 0 on the shoot keys (quit 0) and 4
+    # on the cancel keys; anything but 0 aborts without touching the disk.
+    mpv --really-quiet --profile=low-latency --untimed \
+      --demuxer-lavf-o=video_size=1280x720 \
+      --title="Webcam — SPACE: photo, Q: cancel" \
+      --input-conf=<(printf '%s\n' "SPACE quit 0" "ENTER quit 0" "MBTN_LEFT quit 0" "q quit 4" "ESC quit 4") \
+      "av://v4l2:$DEVICE"
+    [[ $? -ne 0 ]] && exit 0
+  fi
+
+  # Read ~20 frames and keep only the last one (-update 1) so auto-exposure
+  # and white balance have settled; a cold camera's first frame is dark
+  # garbage. Retried briefly: right after the preview closes, mpv may not
+  # have released the device yet. 1080p first, camera default as fallback.
+  capture() {
+    ffmpeg -hide_banner -loglevel error -f v4l2 -framerate 30 "$@" \
+      -i "$DEVICE" -frames:v 20 -update 1 -y "$FILEPATH"
+  }
+  ok=""
+  for _ in 1 2 3; do
+    if capture -video_size 1920x1080 2>/dev/null || capture; then
+      ok=1
+      break
+    fi
+    sleep 0.5
+  done
+  if [[ -z $ok ]]; then
+    omarchy-notification-send "Webcam capture failed" "No usable camera on $DEVICE" || true
+    exit 1
+  fi
 fi
 
 case "$PROCESSING" in

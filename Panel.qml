@@ -29,6 +29,7 @@ Panel {
   property bool webcamPreview: false
   property int frameSeq: 0
   readonly property string webcamFrameFile: Quickshell.env("XDG_RUNTIME_DIR") + "/tarpediem-webcam-preview.jpg"
+  readonly property string webcamFullFile: Quickshell.env("XDG_RUNTIME_DIR") + "/tarpediem-webcam-full.jpg"
   readonly property string webcamDevice: {
     var d = Quickshell.env("WEBCAM_DEVICE")
     return d ? d : "/dev/video0"
@@ -149,12 +150,11 @@ Panel {
     webcamPreview = false
     previewProc.running = false
   }
-  // The default (booth) mode saves the file AND puts it on the clipboard.
-  // run() closes the panel first, which also stops the viewfinder; the
-  // capture script retries while ffmpeg releases the device.
+  // The photo IS the frame on screen: the viewfinder keeps a full-resolution
+  // copy of its latest frame on tmpfs, and shooting just picks that file up —
+  // no camera restart, no delay. booth mode = save + clipboard + notification.
   function shootWebcam() {
-    stopWebcamPreview()
-    run("bash " + pluginPath + "/webcam-shot.sh booth --no-preview")
+    run("bash " + pluginPath + "/webcam-shot.sh booth --from-frame " + webcamFullFile)
   }
   function probeRecording() { if (!probe.running) probe.running = true }
 
@@ -212,15 +212,20 @@ Panel {
   }
 
   // Viewfinder frames: -update 1 rewrites the same file, -atomic_writing
-  // keeps the Image from ever reading a half-written JPEG.
+  // keeps readers from ever seeing a half-written JPEG. Two outputs from the
+  // one camera stream: a downscaled preview for the panel, and the latest
+  // frame at full 1080p that shootWebcam() picks up as the photo.
   Process {
     id: previewProc
-    command: ["ffmpeg", "-hide_banner", "-loglevel", "error",
-      "-f", "v4l2", "-framerate", "30", "-video_size", "1280x720",
+    command: ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+      "-f", "v4l2", "-framerate", "30", "-video_size", "1920x1080",
       "-i", root.webcamDevice,
       "-vf", "fps=12,scale=720:-2",
-      "-f", "image2", "-update", "1", "-atomic_writing", "1", "-y",
-      root.webcamFrameFile]
+      "-f", "image2", "-update", "1", "-atomic_writing", "1",
+      root.webcamFrameFile,
+      "-vf", "fps=12",
+      "-f", "image2", "-update", "1", "-atomic_writing", "1",
+      root.webcamFullFile]
   }
 
   Timer {
