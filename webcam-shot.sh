@@ -1,7 +1,9 @@
 #!/bin/bash
 # Webcam photo for the screenshot widget, photobooth style.
-# Usage: webcam-shot.sh [slurp|copy|save] [--no-preview]
-#   Default flow: an mpv window shows the live feed so you can frame yourself;
+# Usage: webcam-shot.sh [booth|slurp|copy|save] [--no-preview]
+#   booth (default): save the file AND put it on the clipboard, with a
+#   notification — what the widget's in-panel viewfinder uses.
+#   Standalone CLI use without --no-preview opens an mpv viewfinder instead;
 #   SPACE / ENTER / left click takes the photo, Q / ESC cancels.
 # Device override: WEBCAM_DEVICE=/dev/videoN
 
@@ -9,7 +11,7 @@
 OUTPUT_DIR="${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}}"
 mkdir -p "$OUTPUT_DIR"
 
-PROCESSING="${1:-save}"
+PROCESSING="${1:-booth}"
 DEVICE="${WEBCAM_DEVICE:-/dev/video0}"
 FILENAME="webcam-$(date +'%Y-%m-%d_%H-%M-%S').jpg"
 FILEPATH="$OUTPUT_DIR/$FILENAME"

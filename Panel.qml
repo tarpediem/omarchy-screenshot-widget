@@ -24,6 +24,16 @@ Panel {
 
   readonly property string pluginPath: Quickshell.env("HOME") + "/.config/omarchy/plugins/tarpediem.screenshot"
 
+  // Webcam viewfinder shown inside the panel: an ffmpeg side process writes
+  // frames to one tmpfs JPEG (atomically) and an Image reloads it ~11x/s.
+  property bool webcamPreview: false
+  property int frameSeq: 0
+  readonly property string webcamFrameFile: Quickshell.env("XDG_RUNTIME_DIR") + "/tarpediem-webcam-preview.jpg"
+  readonly property string webcamDevice: {
+    var d = Quickshell.env("WEBCAM_DEVICE")
+    return d ? d : "/dev/video0"
+  }
+
   // What happens to a screenshot once captured — the second argument of
   // omarchy-capture-screenshot. Persisted in shell.json the way the clock
   // persists its format, so the choice survives a shell restart.
@@ -44,7 +54,7 @@ Panel {
       { type: "action", icon: "\uf125", label: "Region",       hint: "r", cmd: "omarchy-capture-screenshot region" + p },
       { type: "action", icon: "\uf2d0", label: "Window",       hint: "w", cmd: "omarchy-capture-screenshot windows" + p },
       { type: "action", icon: "\uf065", label: "Full screen",  hint: "f", cmd: "omarchy-capture-screenshot fullscreen" + p },
-      { type: "action", icon: "\u{F05A0}", label: "Webcam photo", hint: "b", cmd: "bash " + pluginPath + "/webcam-shot.sh" + p },
+      { type: "action", icon: "\u{F05A0}", label: "Webcam photo", hint: "b", webcam: true },
       { type: "header", label: "RECORDING" }
     ]
     if (recording) {
@@ -82,14 +92,17 @@ Panel {
     cursor = ((cursor + delta) % n + n) % n
   }
 
-  function activateCursor() {
-    var entry = actionAt(cursor)
-    if (entry) run(entry.cmd)
+  function activateEntry(entry) {
+    if (!entry) return
+    if (entry.webcam) startWebcamPreview()
+    else run(entry.cmd)
   }
+
+  function activateCursor() { activateEntry(actionAt(cursor)) }
 
   function runHint(key) {
     for (var i = 0; i < entries.length; i++)
-      if (entries[i].type === "action" && entries[i].hint === key) { run(entries[i].cmd); return true }
+      if (entries[i].type === "action" && entries[i].hint === key) { activateEntry(entries[i]); return true }
     return false
   }
 
@@ -127,6 +140,22 @@ Panel {
 
   function quickShot(mode) { run("omarchy-capture-screenshot " + mode + " " + processing) }
   function stopRecording() { run("omarchy-capture-screenrecording --stop-recording") }
+
+  function startWebcamPreview() {
+    webcamPreview = true
+    previewProc.running = true
+  }
+  function stopWebcamPreview() {
+    webcamPreview = false
+    previewProc.running = false
+  }
+  // The default (booth) mode saves the file AND puts it on the clipboard.
+  // run() closes the panel first, which also stops the viewfinder; the
+  // capture script retries while ffmpeg releases the device.
+  function shootWebcam() {
+    stopWebcamPreview()
+    run("bash " + pluginPath + "/webcam-shot.sh booth --no-preview")
+  }
   function probeRecording() { if (!probe.running) probe.running = true }
 
   implicitWidth: button.implicitWidth
@@ -134,6 +163,7 @@ Panel {
 
   onOpenedChanged: {
     if (opened) { cursor = -1; probeRecording() }
+    else stopWebcamPreview()
   }
   onRecordingChanged: {
     if (cursor >= actionCount) cursor = -1
@@ -181,6 +211,25 @@ Panel {
     onExited: function(exitCode) { root.recording = (exitCode === 0) }
   }
 
+  // Viewfinder frames: -update 1 rewrites the same file, -atomic_writing
+  // keeps the Image from ever reading a half-written JPEG.
+  Process {
+    id: previewProc
+    command: ["ffmpeg", "-hide_banner", "-loglevel", "error",
+      "-f", "v4l2", "-framerate", "30", "-video_size", "1280x720",
+      "-i", root.webcamDevice,
+      "-vf", "fps=12,scale=720:-2",
+      "-f", "image2", "-update", "1", "-atomic_writing", "1", "-y",
+      root.webcamFrameFile]
+  }
+
+  Timer {
+    interval: 90
+    running: root.webcamPreview
+    repeat: true
+    onTriggered: root.frameSeq++
+  }
+
   IpcHandler {
     target: "tarpediem.screenshot"
 
@@ -226,14 +275,16 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       onMoveRequested: function(dx, dy) {
+        if (root.webcamPreview) return
         if (dy !== 0) root.moveCursor(dy)
         else if (dx !== 0) root.cycleProcessing(dx)
       }
-      onActivateRequested: root.activateCursor()
-      onCloseRequested: root.close()
+      onActivateRequested: root.webcamPreview ? root.shootWebcam() : root.activateCursor()
+      onCloseRequested: root.webcamPreview ? root.stopWebcamPreview() : root.close()
       onDeleteRequested: if (root.recording) root.stopRecording()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(t) {
+        if (root.webcamPreview) { if (t === " ") root.shootWebcam(); return }
         if (t === "1" || t === "2" || t === "3") { root.setProcessing(root.processingModes[parseInt(t) - 1].id); return }
         if (t === "m") { root.cycleProcessing(1); return }
         root.runHint(t)
@@ -248,7 +299,9 @@ Panel {
 
         PanelHero {
           title: "Capture"
-          meta: root.recording ? "Recording — gpu-screen-recorder running" : "Ready — screenshots land in Pictures"
+          meta: root.webcamPreview ? "Webcam — photo goes to clipboard + Pictures"
+                                   : root.recording ? "Recording — gpu-screen-recorder running"
+                                                    : "Ready — screenshots land in Pictures"
           foreground: root.bar.foreground
           fontFamily: root.bar.fontFamily
           iconComponent: Component {
@@ -262,10 +315,61 @@ Panel {
           }
         }
 
+        // ---------- Webcam viewfinder ----------
+        Column {
+          width: parent.width
+          spacing: Style.space(8)
+          visible: root.webcamPreview
+
+          Rectangle {
+            width: parent.width
+            height: Math.round(width * 9 / 16)
+            radius: Style.space(6)
+            color: "#000000"
+            clip: true
+
+            Image {
+              id: viewfinder
+              anchors.fill: parent
+              fillMode: Image.PreserveAspectFit
+              cache: false
+              asynchronous: true
+              source: root.webcamPreview ? "file://" + root.webcamFrameFile + "?s=" + root.frameSeq : ""
+            }
+
+            Text {
+              anchors.centerIn: parent
+              visible: root.webcamPreview && viewfinder.status !== Image.Ready
+              textFormat: Text.PlainText
+              text: "Starting camera…"
+              color: "#dddddd"
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.shootWebcam()
+            }
+          }
+
+          Text {
+            width: parent.width
+            horizontalAlignment: Text.AlignHCenter
+            textFormat: Text.PlainText
+            text: "Space / click — photo        Esc — back"
+            color: Qt.darker(root.bar.foreground, 1.3)
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+        }
+
         // ---------- After-capture mode ----------
         Column {
           width: parent.width
           spacing: Style.space(8)
+          visible: !root.webcamPreview
 
           PanelSectionHeader {
             text: "AFTER CAPTURE"
@@ -302,6 +406,7 @@ Panel {
         Column {
           width: parent.width
           spacing: Style.space(2)
+          visible: !root.webcamPreview
 
           Repeater {
             model: root.entries
@@ -384,7 +489,7 @@ Panel {
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onEntered: root.cursor = entryItem.modelData.actionIndex
-                  onClicked: root.run(entryItem.modelData.cmd)
+                  onClicked: root.activateEntry(entryItem.modelData)
                 }
               }
             }
