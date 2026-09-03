@@ -24,11 +24,14 @@ FILENAME="webcam-$(date +'%Y-%m-%d_%H-%M-%S').jpg"
 FILEPATH="$OUTPUT_DIR/$FILENAME"
 
 if [[ $2 == "--from-frame" ]]; then
-  if [[ ! -s $3 ]]; then
+  # Path resolved here rather than passed through the widget's command
+  # string, so no environment value is ever interpolated into shell syntax.
+  FRAME="${3:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/tarpediem-webcam-full.jpg}"
+  if [[ ! -s $FRAME ]]; then
     omarchy-notification-send "Webcam capture failed" "No viewfinder frame found" || true
     exit 1
   fi
-  cp "$3" "$FILEPATH"
+  cp "$FRAME" "$FILEPATH"
 else
   if [[ $2 != "--no-preview" ]]; then
     # Standalone CLI viewfinder. mpv exits 0 on the shoot keys (quit 0) and 4

@@ -22,8 +22,6 @@ Panel {
   property int cursor: -1
   property string pendingCommand: ""
 
-  readonly property string pluginPath: Quickshell.env("HOME") + "/.config/omarchy/plugins/tarpediem.screenshot"
-
   // Webcam viewfinder shown inside the panel: an ffmpeg side process writes
   // frames to one tmpfs JPEG (atomically) and an Image reloads it ~11x/s.
   property bool webcamPreview: false
@@ -171,8 +169,13 @@ Panel {
   // The photo IS the frame on screen: the viewfinder keeps a full-resolution
   // copy of its latest frame on tmpfs, and shooting just picks that file up —
   // no camera restart, no delay. booth mode = save + clipboard + notification.
+  //
+  // The command is a fixed literal on purpose: interpolating $HOME or
+  // $XDG_RUNTIME_DIR into a shell string would break (or worse) on exotic
+  // values. Tilde expansion is not subject to word splitting, and the script
+  // resolves the frame path from its own environment.
   function shootWebcam() {
-    run("bash " + pluginPath + "/webcam-shot.sh booth --from-frame " + webcamFullFile)
+    run("bash ~/.config/omarchy/plugins/tarpediem.screenshot/webcam-shot.sh booth --from-frame")
   }
   function probeRecording() { if (!probe.running) probe.running = true }
 
