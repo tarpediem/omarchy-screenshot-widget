@@ -49,13 +49,16 @@ if [[ -z $ok ]]; then
 fi
 
 case "$PROCESSING" in
+# Clipboard offers are single-type on Wayland and most paste targets
+# (Claude Code, browsers, chat apps) only ask for image/png, so convert:
+# a jpeg-only offer looks like an empty clipboard to them.
 copy)
-  wl-copy --type image/jpeg <"$FILEPATH"
+  magick "$FILEPATH" png:- | wl-copy --type image/png
   rm -f "$FILEPATH"
   ;;
 save) ;;
 *)
-  wl-copy --type image/jpeg <"$FILEPATH"
+  magick "$FILEPATH" png:- | wl-copy --type image/png
   omarchy-notification-send "Webcam photo saved and copied" "$FILENAME" --image "$FILEPATH" || true
   ;;
 esac
