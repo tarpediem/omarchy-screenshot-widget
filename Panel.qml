@@ -328,18 +328,56 @@ Panel {
             color: "#000000"
             clip: true
 
-            Image {
+            // Double-buffered viewfinder: each new frame is loaded into the
+            // hidden Image and only swapped in once fully decoded. A single
+            // reloading Image goes blank during every async load, which
+            // flickers at 11 fps.
+            Item {
               id: viewfinder
               anchors.fill: parent
-              fillMode: Image.PreserveAspectFit
-              cache: false
-              asynchronous: true
-              source: root.webcamPreview ? "file://" + root.webcamFrameFile + "?s=" + root.frameSeq : ""
+              property int shown: -1
+              readonly property bool ready: shown >= 0
+
+              Connections {
+                target: root
+                function onFrameSeqChanged() {
+                  if (!root.webcamPreview) return
+                  var back = viewfinder.shown === 0 ? imgB : imgA
+                  back.source = "file://" + root.webcamFrameFile + "?s=" + root.frameSeq
+                }
+                function onWebcamPreviewChanged() {
+                  if (!root.webcamPreview) {
+                    viewfinder.shown = -1
+                    imgA.source = ""
+                    imgB.source = ""
+                  }
+                }
+              }
+
+              Image {
+                id: imgA
+                anchors.fill: parent
+                fillMode: Image.PreserveAspectFit
+                cache: false
+                asynchronous: true
+                visible: viewfinder.shown === 0
+                onStatusChanged: if (status === Image.Ready) viewfinder.shown = 0
+              }
+
+              Image {
+                id: imgB
+                anchors.fill: parent
+                fillMode: Image.PreserveAspectFit
+                cache: false
+                asynchronous: true
+                visible: viewfinder.shown === 1
+                onStatusChanged: if (status === Image.Ready) viewfinder.shown = 1
+              }
             }
 
             Text {
               anchors.centerIn: parent
-              visible: root.webcamPreview && viewfinder.status !== Image.Ready
+              visible: root.webcamPreview && !viewfinder.ready
               textFormat: Text.PlainText
               text: "Starting camera…"
               color: "#dddddd"
