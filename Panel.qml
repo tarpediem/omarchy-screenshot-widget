@@ -38,7 +38,22 @@ Panel {
   // What happens to a screenshot once captured — the second argument of
   // omarchy-capture-screenshot. Persisted in shell.json the way the clock
   // persists its format, so the choice survives a shell restart.
-  readonly property string processing: setting("processing", "slurp")
+  //
+  // Clamped to the documented enum: this value and the IPC screenshot mode
+  // both end up inside command strings, so anything outside the known
+  // variants is discarded — IPC calls or a hand-edited shell.json must not
+  // be able to inject shell syntax.
+  readonly property string processing: {
+    var p = setting("processing", "slurp")
+    return isProcessingMode(p) ? p : "slurp"
+  }
+  readonly property var screenshotModes: ["smart", "region", "windows", "fullscreen"]
+
+  function isProcessingMode(p) {
+    for (var i = 0; i < processingModes.length; i++)
+      if (processingModes[i].id === p) return true
+    return false
+  }
   readonly property var processingModes: [
     { id: "slurp", icon: "\uf040", label: "Edit", detail: "Save + clipboard + editor" },
     { id: "copy",  icon: "\uf0c5", label: "Copy", detail: "Clipboard only" },
@@ -119,7 +134,7 @@ Panel {
   }
 
   function setProcessing(mode) {
-    if (mode === processing) return
+    if (!isProcessingMode(mode) || mode === processing) return
     var entry = { id: root.moduleName }
     for (var key in root.settings) if (key !== "id") entry[key] = root.settings[key]
     entry.processing = mode
@@ -139,7 +154,10 @@ Panel {
     launchTimer.restart()
   }
 
-  function quickShot(mode) { run("omarchy-capture-screenshot " + mode + " " + processing) }
+  function quickShot(mode) {
+    if (screenshotModes.indexOf(mode) === -1) return
+    run("omarchy-capture-screenshot " + mode + " " + processing)
+  }
   function stopRecording() { run("omarchy-capture-screenrecording --stop-recording") }
 
   function startWebcamPreview() {
