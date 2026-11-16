@@ -24,7 +24,8 @@ omarchy bar put tarpediem.screenshot --after omarchy.tray
 Update later with `omarchy plugin update tarpediem.screenshot`, remove with
 `omarchy plugin remove tarpediem.screenshot`.
 
-Requires Omarchy 4.x (the Quickshell-based shell). No extra packages: `grim`,
+Requires Omarchy 4.5 or later (scrolling capture, webcam recording and
+`omarchy-capture-screenrecording --status` arrived there). No extra packages: `grim`,
 `slurp`, `gpu-screen-recorder`, `tesseract` and `hyprpicker` are what Omarchy
 already uses for its own capture commands.
 
@@ -36,15 +37,15 @@ already uses for its own capture commands.
 - **Right click** takes a smart-region screenshot right away — or stops the
   recording while one is running
 - **Middle click** takes a region screenshot right away
-- While `gpu-screen-recorder` runs, the camera turns into a pulsing record dot
+- While an Omarchy recording runs, the camera turns into a pulsing record dot
 
 ## Panel
 
 | Section | Rows |
 |---|---|
-| After capture | **Edit** (save + clipboard + editor notification), **Copy** (clipboard only), **Save** (file only) — the second argument of `omarchy-capture-screenshot` |
-| Screenshot | Smart region, Region, Window, Full screen, Webcam photo (live viewfinder inside the panel — `Space` or click shoots, `Esc` goes back; the photo is saved to Pictures and copied to the clipboard) |
-| Recording | Record region, Record full screen, Record with desktop + microphone audio — replaced by **Stop recording** while one runs |
+| After capture | **Edit** (save + clipboard, Open/Edit buttons in the notification), **Copy** (clipboard only), **Save** (file only) — the second argument of `omarchy-capture-screenshot` |
+| Screenshot | Smart region, Region, Window, Full screen, Scrolling (long pages), Webcam photo (live viewfinder inside the panel — `Space` or click shoots, `Esc` goes back; the photo is saved to Pictures and copied to the clipboard) |
+| Recording | Record region, Record full screen, Record with desktop + microphone audio, Record with webcam (audio + webcam overlay) — replaced by **Stop recording** while one runs |
 | Tools | Text (OCR), QR code, Color picker |
 
 The "After capture" choice is persisted in `~/.config/omarchy/shell.json` on
@@ -63,9 +64,9 @@ capture, so the popup never ends up in the screenshot.
 |---|---|
 | `j` / `k`, arrows | move the cursor |
 | `Enter`, `Space` | run the highlighted row |
-| `s` `r` `w` `f` | smart / region / window / full-screen screenshot |
+| `s` `r` `w` `f` `d` | smart / region / window / full-screen / scrolling screenshot |
 | `b` | webcam viewfinder (then `Space`/click = photo, `Esc` = back) |
-| `v` `V` `a` | record region / full screen / with audio |
+| `v` `V` `a` `W` | record region / full screen / with audio / with webcam |
 | `x` | stop recording |
 | `t` `q` `c` | OCR text / QR code / color picker |
 | `1` `2` `3`, `m`, `h` / `l` | after-capture mode |
@@ -79,7 +80,7 @@ Hyprland keybindings:
 
 ```bash
 omarchy-shell tarpediem.screenshot toggle              # open/close the panel
-omarchy-shell tarpediem.screenshot screenshot region   # smart|region|windows|fullscreen
+omarchy-shell tarpediem.screenshot screenshot region   # smart|region|windows|fullscreen|scroll
 omarchy-shell tarpediem.screenshot stop                # stop a running recording
 ```
 

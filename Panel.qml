@@ -9,7 +9,8 @@ import qs.Ui
 // Left click opens a keyboard-driven panel listing every capture flow Omarchy
 // ships (omarchy-capture-*). Right click takes a smart screenshot straight
 // away — or stops a running recording — and middle click grabs a region.
-// The bar icon turns into a pulsing record dot while gpu-screen-recorder runs.
+// The bar icon turns into a pulsing record dot while an Omarchy recording runs
+// (asked of omarchy-capture-screenrecording --status, whichever recorder it uses).
 Panel {
   id: root
   moduleName: "tarpediem.screenshot"
@@ -45,7 +46,7 @@ Panel {
     var p = setting("processing", "slurp")
     return isProcessingMode(p) ? p : "slurp"
   }
-  readonly property var screenshotModes: ["smart", "region", "windows", "fullscreen"]
+  readonly property var screenshotModes: ["smart", "region", "windows", "fullscreen", "scroll"]
 
   function isProcessingMode(p) {
     for (var i = 0; i < processingModes.length; i++)
@@ -53,7 +54,7 @@ Panel {
     return false
   }
   readonly property var processingModes: [
-    { id: "slurp", icon: "\uf040", label: "Edit", detail: "Save + clipboard + editor" },
+    { id: "slurp", icon: "\uf040", label: "Edit", detail: "Save + clipboard, Open/Edit from the notification" },
     { id: "copy",  icon: "\uf0c5", label: "Copy", detail: "Clipboard only" },
     { id: "save",  icon: "\uf0c7", label: "Save", detail: "File only, no editor" }
   ]
@@ -68,6 +69,7 @@ Panel {
       { type: "action", icon: "\uf125", label: "Region",       hint: "r", cmd: "omarchy-capture-screenshot region" + p },
       { type: "action", icon: "\uf2d0", label: "Window",       hint: "w", cmd: "omarchy-capture-screenshot windows" + p },
       { type: "action", icon: "\uf065", label: "Full screen",  hint: "f", cmd: "omarchy-capture-screenshot fullscreen" + p },
+      { type: "action", icon: "\uf07d", label: "Scrolling",    hint: "d", cmd: "omarchy-capture-screenshot scroll" + p },
       { type: "action", icon: "\u{F05A0}", label: "Webcam photo", hint: "b", webcam: true },
       { type: "header", label: "RECORDING" }
     ]
@@ -78,6 +80,7 @@ Panel {
       list.push({ type: "action", icon: "\uf03d", label: "Record region",      hint: "v", cmd: "omarchy-capture-screenrecording" })
       list.push({ type: "action", icon: "\uf03d", label: "Record full screen", hint: "V", cmd: "omarchy-capture-screenrecording --fullscreen" })
       list.push({ type: "action", icon: "\uf130", label: "Record with audio",  hint: "a", cmd: "omarchy-capture-screenrecording --with-desktop-audio --with-microphone-audio" })
+      list.push({ type: "action", icon: "\u{F05A0}", label: "Record with webcam", hint: "W", cmd: "omarchy-capture-screenrecording --with-desktop-audio --with-microphone-audio --with-webcam" })
     }
     list.push({ type: "header", label: "TOOLS" })
     list.push({ type: "action", icon: "\u{F0D11}", label: "Text (OCR)",   hint: "t", cmd: "omarchy-capture-text" })
@@ -147,6 +150,8 @@ Panel {
   // The popup is a layer-shell overlay and would end up in the capture, so
   // close first and launch once the 140 ms fade-out has finished.
   function run(cmd) {
+    // Ignore an empty or missing command instead of assigning undefined.
+    if (typeof cmd !== "string" || cmd === "") return
     pendingCommand = cmd
     close()
     launchTimer.restart()
@@ -228,7 +233,7 @@ Panel {
 
   Process {
     id: probe
-    command: ["pgrep", "-f", "^gpu-screen-recorder"]
+    command: ["omarchy-capture-screenrecording", "--status"]
     onExited: function(exitCode) { root.recording = (exitCode === 0) }
   }
 
